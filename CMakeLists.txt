@@ -49,8 +49,6 @@ ADD_EXECUTABLE(subconverter
     src/templates.cpp
     src/webget.cpp)
 
-
-
 INCLUDE_DIRECTORIES(src)
 LINK_DIRECTORIES(${CMAKE_SOURCE_DIR})
 

@@ -1206,7 +1206,7 @@ std::string subconverter(RESPONSE_CALLBACK_ARGS)
     std::string ext_rename = UrlDecode(getUrlArg(argument, "rename"));
 
     /// switches with default value
-    tribool upload = getUrlArg(argument, "upload"), emoji = getUrlArg(argument, "emoji"), emoji_add = getUrlArg(argument, "add_emoji"), emoji_remove = getUrlArg(argument, "remove_emoji");
+    tribool emoji = getUrlArg(argument, "emoji"), emoji_add = getUrlArg(argument, "add_emoji"), emoji_remove = getUrlArg(argument, "remove_emoji");
     tribool append_type = getUrlArg(argument, "append_type"), tfo = getUrlArg(argument, "tfo"), udp = getUrlArg(argument, "udp"), nodelist = getUrlArg(argument, "list");
     tribool sort_flag = getUrlArg(argument, "sort"), use_sort_script = getUrlArg(argument, "sort_script");
     tribool clash_script = getUrlArg(argument, "script"), add_insert = getUrlArg(argument, "insert");
