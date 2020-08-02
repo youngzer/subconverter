@@ -6,7 +6,6 @@
 #include <rapidjson/writer.h>
 #include <rapidjson/document.h>
 #include <yaml-cpp/yaml.h>
-#include <duktape.h>
 
 #include "misc.h"
 #include "speedtestutil.h"
@@ -20,7 +19,6 @@
 #include "string_hash.h"
 #include "logger.h"
 #include "templates.h"
-#include "script_duktape.h"
 #include "yamlcpp_extra.h"
 #include "interfaces.h"
 
@@ -514,35 +512,9 @@ void nodeRename(nodeInfo &node, const string_array &rename_array)
     string_size pos;
     std::string match, rep;
     std::string &remark = node.remarks, original_remark = node.remarks, returned_remark, real_rule;
-    duk_context *ctx = NULL;
-    defer(duk_destroy_heap(ctx);)
 
     for(const std::string &x : rename_array)
     {
-        if(startsWith(x, "!!script:"))
-        {
-            if(!ctx)
-                ctx = duktape_init();
-            std::string script = x.substr(9);
-            if(startsWith(script, "path:"))
-                script = fileGet(script.substr(5), true);
-            if(ctx)
-            {
-                if(duktape_peval(ctx, script) == 0)
-                {
-                    duk_get_global_string(ctx, "rename");
-                    duktape_push_nodeinfo(ctx, node);
-                    if(duk_pcall(ctx, 1) == 0 && !(returned_remark = duktape_get_res_str(ctx)).empty())
-                        remark = returned_remark;
-                }
-                else
-                {
-                    writeLog(0, "Error when trying to parse rename script:\n" + duktape_get_err_stack(ctx), LOG_LEVEL_ERROR);
-                    duk_pop(ctx); // pop err
-                }
-            }
-            continue;
-        }
         pos = x.rfind("@");
         match = x.substr(0, pos);
         if(pos != x.npos && pos < x.size())
@@ -577,35 +549,9 @@ std::string addEmoji(const nodeInfo &node, const string_array &emoji_array)
 {
     std::string real_rule, ret;
     string_size pos;
-    duk_context *ctx = NULL;
-    defer(duk_destroy_heap(ctx);)
 
     for(const std::string &x : emoji_array)
     {
-        if(startsWith(x, "!!script:"))
-        {
-            if(!ctx)
-                ctx = duktape_init();
-            std::string script = x.substr(9);
-            if(startsWith(script, "path:"))
-                script = fileGet(script.substr(5), true);
-            if(ctx)
-            {
-                if(duktape_peval(ctx, script) == 0)
-                {
-                    duk_get_global_string(ctx, "getEmoji");
-                    duktape_push_nodeinfo(ctx, node);
-                    if(duk_pcall(ctx, 1) == 0 && !(ret = duktape_get_res_str(ctx)).empty())
-                        return ret + " " + node.remarks;
-                }
-                else
-                {
-                    writeLog(0, "Error when trying to parse emoji script:\n" + duktape_get_err_stack(ctx), LOG_LEVEL_ERROR);
-                    duk_pop(ctx); // pop err
-                }
-            }
-            continue;
-        }
         pos = x.rfind(",");
         if(pos == x.npos)
             continue;
@@ -1031,40 +977,6 @@ void groupGenerate(std::string &rule, std::vector<nodeInfo> &nodelist, string_ar
     {
         filtered_nodelist.emplace_back(rule.substr(2));
     }
-    else if(startsWith(rule, "script:"))
-    {
-        duk_context *ctx = duktape_init();
-        if(ctx)
-        {
-            defer(duk_destroy_heap(ctx);)
-            std::string script = fileGet(rule.substr(7), true);
-            if(duktape_peval(ctx, script) == 0)
-            {
-                duk_get_global_string(ctx, "filter");
-                duk_idx_t arr_idx = duk_push_array(ctx), node_idx = 0;
-                for(nodeInfo &x : nodelist)
-                {
-                    duktape_push_nodeinfo_arr(ctx, x, -1);
-                    duk_put_prop_index(ctx, arr_idx, node_idx++);
-                }
-                if(duk_pcall(ctx, 1) == 0)
-                {
-                    std::string result_list = duktape_get_res_str(ctx);
-                    filtered_nodelist = split(regTrim(result_list), "\n");
-                }
-                else
-                {
-                    writeLog(0, "Error when trying to evaluate script:\n" + duktape_get_err_stack(ctx), LOG_LEVEL_ERROR);
-                    duk_pop(ctx);
-                }
-            }
-            else
-            {
-                writeLog(0, "Error when trying to parse script:\n" + duktape_get_err_stack(ctx), LOG_LEVEL_ERROR);
-                duk_pop(ctx);
-            }
-        }
-    }
     else
     {
         for(nodeInfo &x : nodelist)
@@ -1091,45 +1003,6 @@ void preprocessNodes(std::vector<nodeInfo> &nodes, const extra_settings &ext)
     if(ext.sort_flag)
     {
         bool failed = true;
-        if(ext.sort_script.size())
-        {
-            try
-            {
-                duk_context *ctx = duktape_init();
-                if(ctx)
-                {
-                    defer(duk_destroy_heap(ctx);)
-                    if(duktape_peval(ctx, ext.sort_script) == 0)
-                    {
-                        auto comparer = [&](const nodeInfo &a, const nodeInfo &b)
-                        {
-                            if(a.linkType < 1 || a.linkType > 5)
-                                return 1;
-                            if(b.linkType < 1 || b.linkType > 5)
-                                return 0;
-                            duk_get_global_string(ctx, "compare");
-                            /// push 2 nodeinfo
-                            duktape_push_nodeinfo(ctx, a);
-                            duktape_push_nodeinfo(ctx, b);
-                            /// call function
-                            duk_pcall(ctx, 2);
-                            return duktape_get_res_int(ctx);
-                        };
-                        std::sort(nodes.begin(), nodes.end(), comparer);
-                        failed = false;
-                    }
-                    else
-                    {
-                        writeLog(0, "Error when trying to parse script:\n" + duktape_get_err_stack(ctx), LOG_LEVEL_ERROR);
-                        duk_pop(ctx); /// pop err
-                    }
-                }
-            }
-            catch (std::exception&)
-            {
-                //failed
-            }
-        }
         if(failed) std::sort(nodes.begin(), nodes.end(), [](const nodeInfo &a, const nodeInfo &b)
         {
             return a.remarks < b.remarks;
