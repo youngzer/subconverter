@@ -32,11 +32,11 @@ const string_array clash_ssr_ciphers = {"rc4-md5", "aes-128-ctr", "aes-192-ctr",
 
 /// rule type lists
 #define basic_types "DOMAIN", "DOMAIN-SUFFIX", "DOMAIN-KEYWORD", "IP-CIDR", "SRC-IP-CIDR", "GEOIP", "MATCH", "FINAL"
-const string_array clash_rule_type = {basic_types, "IP-CIDR6", "SRC-PORT", "DST-PORT"};
-const string_array surge2_rule_type = {basic_types, "IP-CIDR6", "USER-AGENT", "URL-REGEX", "PROCESS-NAME", "IN-PORT", "DEST-PORT", "SRC-IP"};
-const string_array surge_rule_type = {basic_types, "IP-CIDR6", "USER-AGENT", "URL-REGEX", "AND", "OR", "NOT", "PROCESS-NAME", "IN-PORT", "DEST-PORT", "SRC-IP"};
-const string_array quanx_rule_type = {basic_types, "USER-AGENT", "HOST", "HOST-SUFFIX", "HOST-KEYWORD"};
-const string_array surfb_rule_type = {basic_types, "IP-CIDR6", "PROCESS-NAME", "IN-PORT", "DEST-PORT", "SRC-IP"};
+string_array clash_rule_type = {basic_types, "IP-CIDR6", "SRC-PORT", "DST-PORT"};
+string_array surge2_rule_type = {basic_types, "IP-CIDR6", "USER-AGENT", "URL-REGEX", "PROCESS-NAME", "IN-PORT", "DEST-PORT", "SRC-IP"};
+string_array surge_rule_type = {basic_types, "IP-CIDR6", "USER-AGENT", "URL-REGEX", "AND", "OR", "NOT", "PROCESS-NAME", "IN-PORT", "DEST-PORT", "SRC-IP"};
+string_array quanx_rule_type = {basic_types, "USER-AGENT", "HOST", "HOST-SUFFIX", "HOST-KEYWORD"};
+string_array surfb_rule_type = {basic_types, "IP-CIDR6", "PROCESS-NAME", "IN-PORT", "DEST-PORT", "SRC-IP"};
 
 std::string hostnameToIPAddr(const std::string &host)
 {
@@ -1077,8 +1077,8 @@ void netchToClash(std::vector<nodeInfo> &nodes, YAML::Node &yamlnode, const stri
                 singleproxy["plugin-opts"]["path"] = getUrlArg(pluginopts, "path");
                 singleproxy["plugin-opts"]["tls"] = pluginopts.find("tls") != pluginopts.npos;
                 singleproxy["plugin-opts"]["mux"] = pluginopts.find("mux") != pluginopts.npos;
-                if(ext.skip_cert_verify)
-                    singleproxy["plugin-opts"]["skip-cert-verify"] = true;
+                if(!scv.is_undef())
+                    singleproxy["plugin-opts"]["skip-cert-verify"] = scv.get();
                 break;
             }
             break;
@@ -1095,8 +1095,8 @@ void netchToClash(std::vector<nodeInfo> &nodes, YAML::Node &yamlnode, const stri
             singleproxy["alterId"] = stoi(aid);
             singleproxy["cipher"] = method;
             singleproxy["tls"] = tlssecure;
-            if(scv)
-                singleproxy["skip-cert-verify"] = true;
+            if(!scv.is_undef())
+                singleproxy["skip-cert-verify"] = scv.get();
             switch(hash_(transproto))
             {
             case "tcp"_hash:
@@ -1166,8 +1166,8 @@ void netchToClash(std::vector<nodeInfo> &nodes, YAML::Node &yamlnode, const stri
                 if(std::all_of(password.begin(), password.end(), ::isdigit))
                     singleproxy["password"].SetTag("str");
             }
-            if(scv)
-                singleproxy["skip-cert-verify"] = true;
+            if(!scv.is_undef())
+                singleproxy["skip-cert-verify"] = scv.get();
             break;
         case SPEEDTEST_MESSAGE_FOUNDHTTP:
             singleproxy["type"] = "http";
@@ -1180,8 +1180,8 @@ void netchToClash(std::vector<nodeInfo> &nodes, YAML::Node &yamlnode, const stri
                     singleproxy["password"].SetTag("str");
             }
             singleproxy["tls"] = type == "HTTPS";
-            if(scv)
-                singleproxy["skip-cert-verify"] = true;
+            if(!scv.is_undef())
+                singleproxy["skip-cert-verify"] = scv.get();
             break;
         case SPEEDTEST_MESSAGE_FOUNDTROJAN:
             host = GetMember(json, "Host");
@@ -1191,8 +1191,8 @@ void netchToClash(std::vector<nodeInfo> &nodes, YAML::Node &yamlnode, const stri
                 singleproxy["sni"] = host;
             if(std::all_of(password.begin(), password.end(), ::isdigit) && !password.empty())
                 singleproxy["password"].SetTag("str");
-            if(scv)
-                singleproxy["skip-cert-verify"] = true;
+            if(!scv.is_undef())
+                singleproxy["skip-cert-verify"] = scv.get();
             break;
         case SPEEDTEST_MESSAGE_FOUNDSNELL:
             obfs = GetMember(json, "OBFS");
@@ -1401,7 +1401,7 @@ std::string netchToSurge(std::vector<nodeInfo> &nodes, const std::string &base_c
         processRemark(x.remarks, remark, remarks_list);
 
         hostname = GetMember(json, "Hostname");
-        port = std::to_string((unsigned short)stoi(GetMember(json, "Port")));
+        port = std::to_string((unsigned short)to_int(GetMember(json, "Port")));
         username = GetMember(json, "Username");
         password = GetMember(json, "Password");
         method = GetMember(json, "EncryptMethod");
@@ -1469,8 +1469,8 @@ std::string netchToSurge(std::vector<nodeInfo> &nodes, const std::string &base_c
             default:
                 continue;
             }
-            if(scv)
-                proxy += ", skip-cert-verify=1";
+            if(!scv.is_undef())
+                proxy += ", skip-cert-verify=" + std::string(scv.get() ? "1" : "0");
             break;
         case SPEEDTEST_MESSAGE_FOUNDSSR:
             if(ext.surge_ssr_path.empty() || surge_ver < 2)
@@ -1508,8 +1508,8 @@ std::string netchToSurge(std::vector<nodeInfo> &nodes, const std::string &base_c
                 proxy += ", username=" + username;
             if(password.size())
                 proxy += ", password=" + password;
-            if(scv)
-                proxy += ", skip-cert-verify=1";
+            if(!scv.is_undef())
+                proxy += ", skip-cert-verify=" + std::string(scv.get() ? "1" : "0");
             break;
         case SPEEDTEST_MESSAGE_FOUNDHTTP:
             proxy = "http, " + hostname + ", " + port;
@@ -1518,8 +1518,8 @@ std::string netchToSurge(std::vector<nodeInfo> &nodes, const std::string &base_c
             if(password.size())
                 proxy += ", password=" + password;
             proxy += std::string(", tls=") + (type == "HTTPS" ? "true" : "false");
-            if(scv)
-                proxy += ", skip-cert-verify=1";
+            if(!scv.is_undef())
+                proxy += ", skip-cert-verify=" + std::string(scv.get() ? "1" : "0");
             break;
         case SPEEDTEST_MESSAGE_FOUNDTROJAN:
             if(surge_ver < 4)
@@ -1528,8 +1528,8 @@ std::string netchToSurge(std::vector<nodeInfo> &nodes, const std::string &base_c
             proxy = "trojan, " + hostname + ", " + port + ", password=" + password;
             if(host.size())
                 proxy += ", sni=" + host;
-            if(scv)
-                proxy += ", skip-cert-verify=1";
+            if(!scv.is_undef())
+                proxy += ", skip-cert-verify=" + std::string(scv.get() ? "1" : "0");
             break;
         case SPEEDTEST_MESSAGE_FOUNDSNELL:
             obfs = GetMember(json, "OBFS");
@@ -1659,7 +1659,7 @@ std::string netchToSingle(std::vector<nodeInfo> &nodes, int types, const extra_s
 
         remark = x.remarks;
         hostname = GetMember(json, "Hostname");
-        port = std::to_string((unsigned short)stoi(GetMember(json, "Port")));
+        port = std::to_string((unsigned short)to_int(GetMember(json, "Port")));
         password = GetMember(json, "Password");
         method = GetMember(json, "EncryptMethod");
         plugin = GetMember(json, "Plugin");
@@ -1769,7 +1769,7 @@ std::string netchToSSSub(std::string &base_conf, std::vector<nodeInfo> &nodes, c
 
         remark = x.remarks;
         hostname = x.server;
-        int port = (unsigned short)stoi(GetMember(json, "Port"));
+        int port = (unsigned short)to_int(GetMember(json, "Port"));
         password = GetMember(json, "Password");
         method = GetMember(json, "EncryptMethod");
         plugin = GetMember(json, "Plugin");
@@ -1839,6 +1839,7 @@ void netchToQuan(std::vector<nodeInfo> &nodes, INIReader &ini, std::vector<rules
     std::string id, aid, transproto, faketype, host, edge, path, quicsecure, quicsecret;
     std::string proxyStr;
     bool tlssecure;
+    tribool scv;
     std::vector<nodeInfo> nodelist;
     string_array remarks_list;
 
@@ -1855,7 +1856,7 @@ void netchToQuan(std::vector<nodeInfo> &nodes, INIReader &ini, std::vector<rules
         processRemark(x.remarks, remark, remarks_list);
 
         hostname = GetMember(json, "Hostname");
-        port = std::to_string((unsigned short)stoi(GetMember(json, "Port")));
+        port = std::to_string((unsigned short)to_int(GetMember(json, "Port")));
         method = GetMember(json, "EncryptMethod");
         password = GetMember(json, "Password");
 
@@ -1871,6 +1872,9 @@ void netchToQuan(std::vector<nodeInfo> &nodes, INIReader &ini, std::vector<rules
             faketype = GetMember(json, "FakeType");
             tlssecure = GetMember(json, "TLSSecure") == "true";
 
+            scv = ext.skip_cert_verify;
+            scv.define(GetMember(json, "AllowInsecure"));
+
             if(method == "auto")
                 method = "chacha20-ietf-poly1305";
             proxyStr = remark + " = vmess, " + hostname + ", " + port + ", " + method + ", \"" + id + "\", group=" + x.group;
@@ -1883,8 +1887,8 @@ void netchToQuan(std::vector<nodeInfo> &nodes, INIReader &ini, std::vector<rules
                     proxyStr += "[Rr][Nn]Edge: " + edge;
                 proxyStr += "\"";
             }
-            if(ext.skip_cert_verify)
-                proxyStr += ", certificate=0";
+            if(!scv.is_undef())
+                proxyStr += ", certificate=" + std::string(scv.get() ? "0" : "1");
 
             if(ext.nodelist)
                 proxyStr = "vmess://" + urlsafe_base64_encode(proxyStr);
@@ -1949,8 +1953,8 @@ void netchToQuan(std::vector<nodeInfo> &nodes, INIReader &ini, std::vector<rules
                 if(host.size())
                     proxyStr += ", tls-host=" + host;
             }
-            if(ext.skip_cert_verify)
-                proxyStr += ", certificate=0";
+            if(!scv.is_undef())
+                proxyStr += ", certificate=" + std::string(scv.get() ? "0" : "1");
 
             if(ext.nodelist)
                 proxyStr = "http://" + urlsafe_base64_encode(proxyStr);
@@ -1972,8 +1976,8 @@ void netchToQuan(std::vector<nodeInfo> &nodes, INIReader &ini, std::vector<rules
                 if(host.size())
                     proxyStr += ", tls-host=" + host;
             }
-            if(ext.skip_cert_verify)
-                proxyStr += ", certificate=0";
+            if(!scv.is_undef())
+                proxyStr += ", certificate=" + std::string(scv.get() ? "0" : "1");
 
             if(ext.nodelist)
                 proxyStr = "socks://" + urlsafe_base64_encode(proxyStr);
@@ -2140,7 +2144,7 @@ void netchToQuanX(std::vector<nodeInfo> &nodes, INIReader &ini, std::vector<rule
         processRemark(x.remarks, remark, remarks_list);
 
         hostname = GetMember(json, "Hostname");
-        port = std::to_string((unsigned short)stoi(GetMember(json, "Port")));
+        port = std::to_string((unsigned short)to_int(GetMember(json, "Port")));
         method = GetMember(json, "EncryptMethod");
 
         udp = ext.udp;
@@ -2471,7 +2475,7 @@ std::string netchToSSD(std::vector<nodeInfo> &nodes, std::string &group, std::st
 
         remark = "\"" + replace_all_distinct(UTF8ToCodePoint(x.remarks), "\\u1f1", "\\ud83c\\udd") + "\""; //convert UTF-8 characters to code points
         hostname = GetMember(json, "Hostname");
-        port = (unsigned short)stoi(GetMember(json, "Port"));
+        port = (unsigned short)to_int(GetMember(json, "Port"));
         password = GetMember(json, "Password");
         method = GetMember(json, "EncryptMethod");
         plugin = GetMember(json, "Plugin");
@@ -2574,7 +2578,7 @@ void netchToMellow(std::vector<nodeInfo> &nodes, INIReader &ini, std::vector<rul
         processRemark(x.remarks, remark, remarks_list);
 
         hostname = GetMember(json, "Hostname");
-        port = std::to_string((unsigned short)stoi(GetMember(json, "Port")));
+        port = std::to_string((unsigned short)to_int(GetMember(json, "Port")));
         username = GetMember(json, "Username");
         password = GetMember(json, "Password");
         method = GetMember(json, "EncryptMethod");
@@ -2756,7 +2760,7 @@ std::string netchToLoon(std::vector<nodeInfo> &nodes, const std::string &base_co
         processRemark(x.remarks, remark, remarks_list);
 
         hostname = GetMember(json, "Hostname");
-        port = std::to_string((unsigned short)stoi(GetMember(json, "Port")));
+        port = std::to_string((unsigned short)to_int(GetMember(json, "Port")));
         username = GetMember(json, "Username");
         password = GetMember(json, "Password");
         method = GetMember(json, "EncryptMethod");
@@ -2806,8 +2810,8 @@ std::string netchToLoon(std::vector<nodeInfo> &nodes, const std::string &base_co
             default:
                 continue;
             }
-            if(scv)
-                proxy += ",skip-cert-verify:1";
+            if(!scv.is_undef())
+                proxy += ",skip-cert-verify:" + std::string(scv.get() ? "1" : "0");
             break;
         case SPEEDTEST_MESSAGE_FOUNDSSR:
             protocol = GetMember(json, "Protocol");
@@ -2831,8 +2835,8 @@ std::string netchToLoon(std::vector<nodeInfo> &nodes, const std::string &base_co
             proxy = "trojan," + hostname + "," + port + "," + password;
             if(host.size())
                 proxy += ",tls-name:" + host;
-            if(scv)
-                proxy += ",skip-cert-verify:1";
+            if(!scv.is_undef())
+                proxy += ",skip-cert-verify:" + std::string(scv.get() ? "1" : "0");
             break;
         default:
             continue;
