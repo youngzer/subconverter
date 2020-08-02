@@ -64,7 +64,7 @@ std::string getFormData(const std::string &raw_data);
 void sleep(int interval);
 bool regValid(const std::string &reg);
 bool regFind(const std::string &src, const std::string &match);
-std::string regReplace(const std::string &src, const std::string &match, const std::string &rep, bool global = true);
+std::string regReplace(const std::string &src, const std::string &match, const std::string &rep, bool global = true, bool multiline = true);
 bool regMatch(const std::string &src, const std::string &match);
 int regGetMatch(const std::string &src, const std::string &match, size_t group_count, ...);
 std::string regTrim(const std::string &src);
@@ -181,7 +181,7 @@ public:
 
     operator bool() const { return _M_VALUE == 3; }
 
-    bool is_undef() { return _M_VALUE <= 1; }
+    bool is_undef() const { return _M_VALUE <= 1; }
 
     template <typename T> tribool define(const T &value)
     {
@@ -203,14 +203,14 @@ public:
         return *this;
     }
 
-    bool get(const bool &def_value = false)
+    bool get(const bool &def_value = false) const
     {
         if(_M_VALUE <= 1)
             return def_value;
         return _M_VALUE == 3;
     }
 
-    std::string get_str()
+    std::string get_str() const
     {
         switch(_M_VALUE)
         {
